@@ -1,7 +1,8 @@
 import torch
-    
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 def Vec3(x, y, z):
-    return torch.tensor([x, y, z])
+    return torch.tensor([x, y, z])#.to(device)
 
 def norm(v):
     return torch.norm(v)
@@ -30,6 +31,23 @@ class Ray:
 
     def __str__(self):
         return f'Ray(origin={self.origin}, direction={self.direction})'
+
+class Sphere:
+    def __init__(self, center: torch.float, radius: float):
+        self.center = center
+        self.radius = radius
+        
+    def hit(self, ray):
+        a = norm_squared(ray.direction)
+        oc = ray.origin - self.center
+        b = 2.0 * dot(oc, ray.direction)
+        c = norm_squared(oc) - self.radius**2
+        discriminant = b**2 - 4*a*c
+        
+        if discriminant < 0:
+            return False
+        return True
+        
     
 if __name__ == '__main__':
     v = Vec3(1.0, 2.0, 3.0)

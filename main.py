@@ -3,6 +3,7 @@ import torch
 import numpy as np
 from vector import *
 import cv2
+from tqdm import tqdm
 
 # if __name__ == '__main__':
 #     from vector import Vec3, Ray, unit_vector, dot, cross, norm_squared
@@ -34,24 +35,21 @@ import cv2
 #     renderer.save_image('output.png')
 # def ray_color(ray: Ray, world: HittableList, depth: int):
     
-def ray_color(ray: Ray):
-    # if depth <= 0:
-    #     return Vec3(0.0, 0.0, 0.0)
+def ray_color(ray: Ray, sphere: Sphere):
+    if sphere.hit(ray):
+        return Vec3(1, 0, 0) * 255.999
     
-    # rec = world.hit(ray, 0.001, float('inf'))
-    # if rec:
-    #     target = rec.p + rec.normal + random_in_unit_sphere()
-    #     return 0.5 * ray_color(Ray(rec.p, target - rec.p), world, depth - 1)
-    
-    unit_direction = unit_vector(ray.direction)
-    t = 0.5 * (unit_direction[2] + 1.0)
+    t = 0.5 * (ray.direction[1] + 1.0)
     return (1.0 - t) * Vec3(1.0, 1.0, 1.0) + t * Vec3(0.5, 0.7, 1.0)
 
 if __name__ == '__main__':
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(device)
     # IMAGE
     aspect_ratio = 16.0 / 9.0
     img_width = 800
-    img_height = 600
+    # img_height = 600
+    img_height = int(img_width / aspect_ratio)
     
     #CAMERA
     viewport_height = 2.0
@@ -63,16 +61,14 @@ if __name__ == '__main__':
     lower_left_corner = origin - horizontal/2 - vertical/2 - Vec3(0.0, 0.0, focal_length)
     # Vec3(-viewport_width/2, -viewport_height/2, -1.0)
     # focal_length = 1.0
-
-    image = torch.zeros(img_height, img_width, 3)
     
-    for i in range(img_height):
-        for j in range(img_width):
-            #TODO: entender u e v
-            u = (i -1) / (img_width - 1)
-            v = 1.0 - (j -1) / (img_height - 1)
+    image = torch.zeros(img_height, img_width, 3).to(device)
+    s1 = Sphere(Vec3(0, 0, -1), 0.5)
+    for j in tqdm(range(img_height)):
+        for i in range(img_width):
+            u = i / (img_width - 1)
+            v = 1.0 - j / (img_height - 1)
             ray = Ray(origin, lower_left_corner + u*horizontal + v*vertical - origin)
-            # color = ray_color(ray)
-            image[i, j] = ray_color(ray) * 255
+            image[j, i] = ray_color(ray, s1) * 255.999
     
-    cv2.imwrite('output.png', image.numpy().astype(np.uint8)[:,:,::-1])
+    cv2.imwrite('output.png', image.numpy()[:, :, ::-1])
