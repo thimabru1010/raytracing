@@ -39,15 +39,56 @@ class Sphere:
         
     def hit(self, ray):
         a = norm_squared(ray.direction)
-        oc = ray.origin - self.center
-        b = 2.0 * dot(oc, ray.direction)
+        oc = self.center - ray.origin
+        halfb = dot(oc, ray.direction)
         c = norm_squared(oc) - self.radius**2
-        discriminant = b**2 - 4*a*c
+        discriminant = halfb**2 - a*c
         
+        # print(discriminant)
         if discriminant < 0:
-            return False
-        return True
+            return -1.0
+        # print('HERE2!')
+        return (halfb - torch.sqrt(discriminant)) / (a)
         
+class Box:
+    def __init__(self, min: torch.Tensor, max: torch.Tensor):
+        self.min = min
+        self.max = max
+        
+        
+    def hit(self, ray):
+        tmin = (self.min[0] - ray.origin[0]) / ray.direction[0]
+        tmax = (self.max[0] - ray.origin[0]) / ray.direction[0]
+        if tmin > tmax:
+            tmin, tmax = tmax, tmin
+        
+        tymin = (self.min[1] - ray.origin[1]) / ray.direction[1]
+        tymax = (self.max[1] - ray.origin[1]) / ray.direction[1]
+        if tymin > tymax:
+            tymin, tymax = tymax, tymin
+        
+        if (tmin > tymax) or (tymin > tmax):
+            return False
+        
+        if tymin > tmin:
+            tmin = tymin
+        if tymax < tmax:
+            tmax = tymax
+        
+        tzmin = (self.min[2] - ray.origin[2]) / ray.direction[2]
+        tzmax = (self.max[2] - ray.origin[2]) / ray.direction[2]
+        if tzmin > tzmax:
+            tzmin, tzmax = tzmax, tzmin
+        
+        if (tmin > tzmax) or (tzmin > tmax):
+            return False
+        
+        if tzmin > tmin:
+            tmin = tzmin
+        if tzmax < tmax:
+            tmax = tzmax
+        
+        return True
     
 if __name__ == '__main__':
     v = Vec3(1.0, 2.0, 3.0)
