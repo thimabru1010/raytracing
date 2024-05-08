@@ -28,6 +28,7 @@ def radiance(light_point, hit_point, light_power):
     return L, l
     # else:
     #     return Vec3(0.0, 0.0, 0.0), Vec3(0.0, 0.0, 0.0)
+
 EPSILON = 1e-4
 
 if __name__ == '__main__':
@@ -53,10 +54,15 @@ if __name__ == '__main__':
     image = torch.zeros(img_height, img_width, 3)#.to(device)
     s1 = Sphere(Vec3(0, 0, -1), 0.5)
     
-    front_wall = Box(Vec3(-0.10,-0.10,-0.10), Vec3(5.65,5.65,0.0))
+    # front_wall = Box(Vec3(-0.10,-0.10,-0.10), Vec3(5.65,5.65,0.0))
+    # left_wall = Box(Vec3(-0.10,-0.1,0.0), Vec3(0.0,5.55,5.55))
     
+    # left_wall = Box(Vec3(0.0, 0.0, 1.0), Vec3(1.0, 1.0, 2.0))
+    floor = Sphere(Vec3(0.0, -1000 -0.5, -1.0), 1000)
+    
+    # Point light
     light_position = Vec3(0.7, 0.7, 0.7)
-    light_intensity = 1.0  # Intensity of the point light source
+    # light_position = Vec3(2.775,5.55,2.775)
     light_power = Vec3(2.775, 5.55, 2.775)
 
     for j in tqdm(range(img_height)):
@@ -65,40 +71,34 @@ if __name__ == '__main__':
             v = 1.0 - j / (img_height - 1)
             ray = Ray(origin, lower_left_corner + u*horizontal + v*vertical - origin)
             
-            # Check for intersections with objects in the scene
-            closest_t = float('inf')  # Initialize to positive infinity
-            closest_obj = None
+            # # Check for intersections with objects in the scene
+            # closest_t = float('inf')  # Initialize to positive infinity
+            # closest_obj = None
         
-            for obj in [s1]:
-                t = obj.hit(ray)
-                if t > 0:
-                    hit_point = ray.at(t)
+            for obj in [s1, floor]:
+                # record = HitRecord(0.0, Vec3(0.0, 0.0, 0.0), Vec3(0.0, 0.0, 0.0))
+                # t = obj.hit(ray)
+                hit, record = obj.hit(ray)
+                # print(hit)
+                if hit:
+                    # hit_point = ray.at(record.t)
+                    hit_point = record.hit_point
                     # print(light_position, hit_point)
                     # print(torch.sum(hit_point - light_position))
                     if abs(torch.sum(hit_point - light_position)) <= EPSILON:
-                        print(hit_point, light_position)
-                        r = t
+                        # print(hit_point, light_position)
+                        r = record.t
                         pixel_color = light_power / r**2
                     else:
-                        normal = unit_vector((hit_point - obj.center))
-                        # # Calculate direction to the light source
-                        # light_direction = unit_vector((light_position - hit_point))
-                        
-                        # # Calculate diffuse shading
-                        # diffuse_factor = max(0, normal.dot(light_direction))
-                        
-                        # # Calculate illumination
-                        # illumination = light_intensity * diffuse_factor
-
-                        # pixel_color = Vec3(illumination, illumination, illumination)
+                        # normal = obj.normal_at_point(hit_point)
+                        normal = record.normal
                         
                         # Phong Metrial model
                         pixel_color = torch.zeros(3)
-                        v = unit_vector(origin - hit_point)
+                        # v = unit_vector(origin - hit_point)
                         L, l = radiance(light_position, hit_point, light_power)
                         m_dif = Vec3(0.5, 0.5, 0.5)
                         pixel_color += m_dif * L * max(0, dot(normal, l))
-                        # r = reflect(-l, normal)
                         
                     image[j, i] = torch.tensor([pixel_color[0], pixel_color[1], pixel_color[2]]) * 255.999
     

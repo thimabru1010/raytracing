@@ -33,11 +33,12 @@ class Ray:
         return f'Ray(origin={self.origin}, direction={self.direction})'
 
 class Sphere:
-    def __init__(self, center: torch.float, radius: float):
+    def __init__(self, center: torch.float, radius: float, color: torch.float=torch.tensor([1.0, 1.0, 1.0]), material: str='diffuse'):
         self.center = center
         self.radius = radius
-        
-    def hit(self, ray):
+        self.color = color
+        self.material = material
+    def old_hit(self, ray):
         a = norm_squared(ray.direction)
         oc = self.center - ray.origin
         halfb = dot(oc, ray.direction)
@@ -49,46 +50,102 @@ class Sphere:
             return -1.0
         # print('HERE2!')
         return (halfb - torch.sqrt(discriminant)) / (a)
+    
+    def hit(self, ray, t_min=0.0, t_max=float('inf')):
+        a = norm_squared(ray.direction)
+        oc = self.center - ray.origin
+        halfb = dot(oc, ray.direction)
+        c = norm_squared(oc) - self.radius**2
+        discriminant = halfb**2 - a*c
+        
+        if discriminant < 0:
+            # return -1.0
+            return False, None
+        else:
+            sqrt = torch.sqrt(discriminant)
+            t = (halfb - sqrt) / a
+            # print(t)
+            # print(t < t_min, t > t_max)
+            if t < t_min or t > t_max:
+                t = (halfb + sqrt) / a
+                # print(t)
+                if t < t_min or t > t_max:
+                    return False, None
+            # print(t)
+            record = HitRecord(0.0, Vec3(0.0, 0.0, 0.0), Vec3(0.0, 0.0, 0.0))
+            record.t = t
+            record.hit_point = ray.at(t)
+            outward_normal = unit_vector((record.hit_point - self.center))
+            front_face = dot(ray.direction, outward_normal) < 0
+            record.normal = outward_normal if front_face else -outward_normal
+            # record.set_face_normal(ray, outward_normal)
+            return True, record
+    
+    def normal_at_point(self, p):
+        return unit_vector(p - self.center)
         
 class Box:
-    def __init__(self, min: torch.Tensor, max: torch.Tensor):
-        self.min = min
-        self.max = max
-        
+    def __init__(self, min_point: torch.Tensor, max_point: torch.Tensor):
+        self.min_point = min_point
+        self.max_point = max_point
         
     def hit(self, ray):
-        tmin = (self.min[0] - ray.origin[0]) / ray.direction[0]
-        tmax = (self.max[0] - ray.origin[0]) / ray.direction[0]
-        if tmin > tmax:
-            tmin, tmax = tmax, tmin
+        t0 = (self.min_point - ray.origin) / ray.direction
+        t1 = (self.max_point - ray.origin) / ray.direction
         
-        tymin = (self.min[1] - ray.origin[1]) / ray.direction[1]
-        tymax = (self.max[1] - ray.origin[1]) / ray.direction[1]
-        if tymin > tymax:
-            tymin, tymax = tymax, tymin
+        t_near = torch.min(t0, t1)
+        t_far = torch.max(t0, t1)
         
-        if (tmin > tymax) or (tymin > tmax):
-            return False
+        t_min = torch.max(t_near)
+        t_max = torch.min(t_far)
+        # print(t_min, t_max)
+
+        if t_min <= t_max and t_min >= 0:
+            print('HERE!')
+            # Ray intersects the box and the exit point is in front of the ray
+            return t_min
+        else:
+            # No intersection or the exit point is behind the ray
+            return -1.0
         
-        if tymin > tmin:
-            tmin = tymin
-        if tymax < tmax:
-            tmax = tymax
+        # t = torch.min(t_min, t_max)
+        # return -1.0 if t < 0 else t
+
+    def normal_at_point(self, point):
+        epsilon = 0.0001  # Small value to handle floating-point precision issues
+        if abs(point[0] - self.min_point[0]) < epsilon:
+            return Vec3(-1.0, 0.0, 0.0)  # Left face
+        elif abs(point[0] - self.max_point[0]) < epsilon:
+            return Vec3(1.0, 0.0, 0.0)   # Right face
+        elif abs(point[1] - self.min_point[1]) < epsilon:
+            return Vec3(0.0, -1.0, 0.0)  # Bottom face
+        elif abs(point[1] - self.max_point[1]) < epsilon:
+            return Vec3(0.0, 1.0, 0.0)   # Top face
+        elif abs(point[2] - self.min_point[2]) < epsilon:
+            return Vec3(0.0, 0.0, -1.0)  # Back face
+        elif abs(point[2] - self.max_point[2]) < epsilon:
+            return Vec3(0.0, 0.0, 1.0)   # Front face
+
+class Plane:
+    def __init__(self, point: torch.Tensor, normal: torch.Tensor):
+        self.point = point
+        self.normal = normal
         
-        tzmin = (self.min[2] - ray.origin[2]) / ray.direction[2]
-        tzmax = (self.max[2] - ray.origin[2]) / ray.direction[2]
-        if tzmin > tzmax:
-            tzmin, tzmax = tzmax, tzmin
-        
-        if (tmin > tzmax) or (tzmin > tmax):
-            return False
-        
-        if tzmin > tmin:
-            tmin = tzmin
-        if tzmax < tmax:
-            tmax = tzmax
-        
-        return True
+    def hit(self, ray):
+        t = dot(self.point - ray.origin, self.normal) / dot(ray.direction, self.normal)
+        return -1.0 if t < 0 else t
+
+    def normal_at_point(self, point):
+        return self.normal
+
+class HitRecord:
+    def __init__(self, t: float, hit_point: torch.Tensor, normal: torch.Tensor):
+        self.t = t
+        self.hit_point = hit_point
+        self.normal = normal
+
+    def __str__(self):
+        return f'HitRecord(t={self.t}, p={self.p}, normal={self.normal})'
     
 if __name__ == '__main__':
     v = Vec3(1.0, 2.0, 3.0)
