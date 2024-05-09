@@ -21,6 +21,29 @@ def cross(v1, v2):
 def unit_vector(v):
     return v / norm(v)
 
+class World:
+    def __init__(self):
+        self.objects = []
+    
+    def add_object(self, obj):
+        self.objects.append(obj)
+        
+    def hit(self, ray, t_min=0.0, t_max=float('inf')):
+        hit_record = HitRecord(0.0, Vec3(0.0, 0.0, 0.0), Vec3(0.0, 0.0, 0.0))
+        hit_anything = False
+        closest_so_far = t_max
+        for obj in self.objects:
+            hit, record = obj.hit(ray, t_min, closest_so_far)
+            if hit:
+                hit_anything = True
+                closest_so_far = record.t
+                # ver se vai precisar copiar coordenada a coordenada
+                hit_record.t = record.t
+                hit_record.hit_point = record.hit_point
+                hit_record.normal = record.normal
+                # hit_record = record
+        return hit_anything, hit_record
+    
 class Ray:
     def __init__(self, origin: torch.float, direction: torch.float):
         self.origin = origin
